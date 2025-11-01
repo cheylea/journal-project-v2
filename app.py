@@ -16,6 +16,11 @@ journal = os.path.join(absolute_path, "database", "journal.db")
 # Make connection to journal database file
 conn = db.connect_to_database(journal)
 
+# --- Simple password gate ---
+password = st.text_input("Enter password", type="password")
+if password != st.secrets["app_password"]:
+    st.stop()  # nothing below runs until the correct password is entered
+
 # --- Sidebar navigation --------------------------------------------------
 st.sidebar.title("🌿 Gratitude Journal")
 page = st.sidebar.radio("Go to", ["Add Entry", "View / Edit Entries", "Dashboard"])
