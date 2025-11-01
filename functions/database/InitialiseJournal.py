@@ -2,15 +2,23 @@
 
 import os
 from pathlib import Path
-from DatabaseFunctions import DatabaseFunctions as db
+import sys
+
+from sqlalchemy import inspect
 import datetime as dt
+
+currentdir = os.path.dirname(os.path.abspath(__file__))
+parentdir = os.path.dirname(currentdir)
+sys.path.insert(0, parentdir)
+
+from DatabaseFunctions import DatabaseFunctions as db
 
 
 THIS_FOLDER = Path(__file__).parent.resolve()
 
 ## Create journal tables
 absolute_path = os.path.dirname(__file__)
-journal = os.path.join(absolute_path, "database", "journal.db")
+journal = os.path.join(absolute_path, "journal.db")
 
 ### Journal Tables
 
