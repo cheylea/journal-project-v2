@@ -1,41 +1,79 @@
+#!/usr/bin/python3
+
+# ---------------------------------------------------------------------
+# Imports
+# ---------------------------------------------------------------------
+
+# App Libraries
 import os
-from pathlib import Path
 import datetime as dt
 import streamlit as st
+from pathlib import Path
 from datetime import datetime
-from matplotlib import pyplot as plt
-import pandas as pd
+import json
+import tempfile
+
+# Google Drive Libraries
 from pydrive2.auth import GoogleAuth
 from pydrive2.drive import GoogleDrive
-import tempfile
-import json
 from oauth2client.service_account import ServiceAccountCredentials
+
+# Dashboard Libraries
+from matplotlib import pyplot as plt
+import pandas as pd
+
+
+# My Database Functions
 from functions.DatabaseFunctions import DatabaseFunctions as db
+from functions.JournalFunctions import JournalFunctions as jf
+from functions.SentimentFunctions import SentimentFunctions as sf
+from functions.WeatherFunctions import WeatherFunctions as wth
 
 # ---------------------------------------------------------------------
-# Google Drive Authentication using Streamlit secrets
+# Google Drive Authentication
 # ---------------------------------------------------------------------
 
-def init_drive_from_service_account():
-    """Authenticate with Google Drive using a service account from Streamlit secrets."""
-    creds_dict = dict(st.secrets["google"])
+def init_drive_from_client_account():
+    """Authenticate with Google Drive using a personal OAuth2 client (from Streamlit secrets)."""
+    # Write client_secrets.json to a temporary file
+    creds_dict = {"installed": dict(st.secrets["google"]["installed"])}
     with tempfile.NamedTemporaryFile(mode="w", delete=False, suffix=".json") as temp:
         json.dump(creds_dict, temp)
         temp.flush()
-        json_path = temp.name
+        client_secrets_path = temp.name
 
-    scopes = ["https://www.googleapis.com/auth/drive"]
-    credentials = ServiceAccountCredentials.from_json_keyfile_name(json_path, scopes)
+    # Initialize GoogleAuth with your client credentials
     gauth = GoogleAuth()
-    gauth.auth_method = "service"
-    gauth.credentials = credentials
+    gauth.DEFAULT_SETTINGS['client_config_file'] = client_secrets_path
+
+    # Path to store OAuth tokens so user doesn’t need to reauthorize every time
+    token_file = "token.json"
+
+    if os.path.exists(token_file):
+        gauth.LoadCredentialsFile(token_file)
+        if gauth.access_token_expired:
+            gauth.Refresh()
+        else:
+            gauth.Authorize()
+    else:
+        # First-time auth flow: opens a browser / prompts to log in
+        auth_url = gauth.GetAuthUrl()
+        st.write("Please authorize this app by visiting this URL:")
+        st.markdown(f"[Authorize Google Drive access]({auth_url})")
+
+        # Ask user to paste the code
+        auth_code = st.text_input("Enter the authorization code here:")
+        if auth_code:
+            gauth.Auth(auth_code)
+            gauth.SaveCredentialsFile(token_file)
+            st.success("Google Drive authorization complete!")
+
     drive = GoogleDrive(gauth)
     return drive
-
 # ---------------------------------------------------------------------
 # 1. Google Drive setup
 # ---------------------------------------------------------------------
-DRIVE = init_drive_from_service_account()
+DRIVE = init_drive_from_client_account()
 DRIVE_FOLDER_ID = "16f87Pusc7okePrUzeK6TYbh0MCfGvYIJ"
 DB_FILENAME = "journal.db"
 LOCAL_DB_PATH = Path("journal.db")
@@ -69,13 +107,14 @@ def upload_db_to_drive(file_obj=None):
     st.sidebar.info("✅ Synced journal.db to Google Drive")
 
 def upload_image_to_drive(local_image_path, folder_id):
-    """Uploads a local image to Google Drive folder."""
+    """Uploads a local image to a Shared Drive folder using a service account."""
     drive_file = DRIVE.CreateFile({
         'title': os.path.basename(local_image_path),
         'parents': [{'id': folder_id}]
     })
     drive_file.SetContentFile(local_image_path)
-    drive_file.Upload()
+    # Tell Google Drive API to allow Shared Drive uploads
+    drive_file.Upload({'supportsAllDrives': True})
     return drive_file['id']
 
 # ---------------------------------------------------------------------
@@ -104,22 +143,20 @@ page = st.sidebar.radio("Go to", ["Add Entry", "View / Edit Entries", "Dashboard
 # ---------------------------------------------------------------------
 # 6. Add Entry
 # ---------------------------------------------------------------------
-def add_entry(text, mood, image_file_id=None):
-    now = datetime.now()
-    db.execute_sql(
-        conn,
-        """
-        INSERT INTO Entry (EntryDate, EntryText, Mood, ImagePath, DateCreated, DateModified)
-        VALUES (?, ?, ?, ?, ?, ?)
-        """,
-        (now.date(), text, str(mood), image_file_id, now, now)
-    )
+
+# Required Attributes
+LAT = st.secrets["LAT"]
+LONG = st.secrets["LONG"]
+WEATHER_API_KEY = st.secrets['WeatherAPIKey']
+CLIENT_ID = st.secrets["CLIENT_ID"]
+CLIENT_SECRET = st.secrets["CLIENT_SECRET"]
+REDIRECT_URI = st.secrets["REDIRECT_URI"]
+SCOPE = st.secrets["SCOPE"]
 
 if page == "Add Entry":
     st.title("✨ Add a Gratitude Entry")
     with st.form("entry_form", clear_on_submit=True):
-        text = st.text_area("What are you grateful for today?")
-        mood = st.slider("Mood (1–5)", 1, 5, 3)
+        text = st.text_area("What are you grateful for today? (Name at last one small thing, on thing you did for your health, and one thing you did for someone else.)", height=200)
         image = st.file_uploader("Add a picture (optional)", type=["jpg", "jpeg", "png"])
         submitted = st.form_submit_button("Save Entry")
         if submitted and text.strip():
@@ -130,7 +167,9 @@ if page == "Add Entry":
                 with open(local_path, "wb") as f:
                     f.write(image.getbuffer())
                 image_file_id = upload_image_to_drive(local_path, DRIVE_FOLDER_ID)
-            add_entry(text, mood, image_file_id)
+            sentiment, mood = sf.get_sentiment(text)
+            temperature, weather = wth.get_weather(LAT, LONG, WEATHER_API_KEY)
+            jf.add_entry(LOCAL_DB_PATH, text, sentiment, mood, weather, temperature, image_file_id)
             st.success("Entry saved!")
 
 # ---------------------------------------------------------------------
@@ -138,15 +177,7 @@ if page == "Add Entry":
 # ---------------------------------------------------------------------
 elif page == "View / Edit Entries":
     st.title("📔 Your Entries")
-    entries = db.execute_sql_fetch_all(
-        conn,
-        """
-        SELECT EntryId, EntryDate, EntryText, Sentiment, Mood, Weather, 
-               Temperature, MostPlayedSong, TodaysGenre, ImagePath
-        FROM Entry
-        ORDER BY EntryDate DESC
-        """
-    )
+    entries = jf.get_entries(LOCAL_DB_PATH)
 
     if not entries:
         st.info("No entries yet. Add one from the 'Add Entry' tab.")
@@ -154,10 +185,10 @@ elif page == "View / Edit Entries":
         for eid, date, text, sentiment, mood, weather, temp, song, genre, image_path in entries:
             with st.expander(f"{str(date)[:10]} — Mood: {mood}/5"):
                 new_text = st.text_area("Edit text", text, key=f"text_{eid}")
-                new_mood = st.slider("Edit mood", 1, 5, int(mood), key=f"mood_{eid}")
                 cols = st.columns(2)
                 with cols[0]:
                     if st.button("💾 Save changes", key=f"save_{eid}"):
+                        jf.update_entry(LOCAL_DB_PATH, eid, new_text, new_sentiment, new_mood, new_weather, new_temp, new_song, new_genre, new_image_path)
                         db.execute_sql(
                             conn,
                             """
@@ -171,15 +202,7 @@ elif page == "View / Edit Entries":
                         st.rerun()
                 with cols[1]:
                     if st.button("🗑️ Delete entry", key=f"delete_{eid}"):
-                        db.execute_sql(
-                            conn,
-                            """
-                            UPDATE Entry
-                            SET DateDeleted = ?
-                            WHERE EntryId = ?
-                            """,
-                            (datetime.now(), eid)
-                        )
+                        jf.delete_entry(LOCAL_DB_PATH, eid)
                         st.warning("Deleted.")
                         st.rerun()
                 if image_path:
