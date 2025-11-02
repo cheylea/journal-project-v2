@@ -30,109 +30,18 @@ from functions.SentimentFunctions import SentimentFunctions as sf
 from functions.WeatherFunctions import WeatherFunctions as wth
 
 # ---------------------------------------------------------------------
-# Google Drive Authentication
+# Database Setup
 # ---------------------------------------------------------------------
 
-import os.path
-from google.oauth2.credentials import Credentials
-from google_auth_oauthlib.flow import InstalledAppFlow
-from google.auth.transport.requests import Request
-from googleapiclient.discovery import build
+THIS_FOLDER = Path(__file__).parent.resolve()
 
-# Adapted from https://www.merge.dev/blog/google-drive-api-python
-SCOPES = [
-    # Full, unrestricted access to the user's Drive (use with caution; requires restricted scope verification)
-    'https://www.googleapis.com/auth/drive',
-    # Per-file access to files created or opened with the app (recommended for most apps)
-    'https://www.googleapis.com/auth/drive.file',
-    # Read-only access to all Drive files
-    'https://www.googleapis.com/auth/drive.readonly',
-    # View and manage metadata of files in your Drive
-    'https://www.googleapis.com/auth/drive.metadata',
-    # View metadata for files in your Drive (read-only)
-    'https://www.googleapis.com/auth/drive.metadata.readonly',
-    # View and manage its own configuration data in your Google Drive
-    'https://www.googleapis.com/auth/drive.appdata',
-]
+## Create journal tables
+absolute_path = os.path.dirname(__file__)
+journal = os.path.join(absolute_path, "database", "journal.db")
 
-def get_drive_service():
-    creds = None
-    if os.path.exists('token.json'):
-        creds = Credentials.from_authorized_user_file('token.json', SCOPES)
-    if not creds or not creds.valid:
-        if creds and creds.expired and creds.refresh_token:
-            creds.refresh(Request())
-        else:
-            creds_dict = {"installed": dict(st.secrets["google"]["installed"])}
-            with tempfile.NamedTemporaryFile(mode="w", delete=False, suffix=".json") as temp:
-                json.dump(creds_dict, temp)
-                temp.flush()
-                client_secrets_path = temp.name
-            flow = InstalledAppFlow.from_client_secrets_file(client_secrets_path, SCOPES)
-            creds = flow.run_local_server(port=61204)
+# Make connection to journal database file
+LOCAL_DB_PATH = db.connect_to_database(journal)
 
-            gauth = GoogleAuth()
-            gauth.CommandLineAuth()
-        with open('token.json', 'w') as token:
-            token.write(creds.to_json())
-    return build('drive', 'v3', credentials=creds)
-
-# ---------------------------------------------------------------------
-# 1. Google Drive setup
-# ---------------------------------------------------------------------
-DRIVE = get_drive_service()
-DRIVE_FOLDER_ID = "16f87Pusc7okePrUzeK6TYbh0MCfGvYIJ"
-DB_FILENAME = "journal.db"
-LOCAL_DB_PATH = Path("journal.db")
-
-def download_db_from_drive():
-    """Download the latest journal.db from Google Drive if it exists."""
-    file_list = DRIVE.ListFile(
-        {'q': f"'{DRIVE_FOLDER_ID}' in parents and title='{DB_FILENAME}' and trashed=false"}
-    ).GetList()
-    if file_list:
-        file = file_list[0]
-        file.GetContentFile(LOCAL_DB_PATH)
-        st.sidebar.success("☁️ Downloaded journal.db from Drive")
-        return file
-    else:
-        st.sidebar.warning("⚠️ No database found on Drive — a new one will be created.")
-        return None
-
-def upload_db_to_drive(file_obj=None):
-    """Upload or update journal.db back to Google Drive."""
-    if file_obj:
-        file_obj.SetContentFile(LOCAL_DB_PATH)
-        file_obj.Upload()
-    else:
-        new_file = DRIVE.CreateFile({
-            "title": DB_FILENAME,
-            "parents": [{"id": DRIVE_FOLDER_ID}]
-        })
-        new_file.SetContentFile(LOCAL_DB_PATH)
-        new_file.Upload()
-    st.sidebar.info("✅ Synced journal.db to Google Drive")
-
-def upload_image_to_drive(local_image_path, folder_id):
-    """Uploads a local image to a Shared Drive folder using a service account."""
-    drive_file = DRIVE.CreateFile({
-        'title': os.path.basename(local_image_path),
-        'parents': [{'id': folder_id}]
-    })
-    drive_file.SetContentFile(local_image_path)
-    # Tell Google Drive API to allow Shared Drive uploads
-    drive_file.Upload({'supportsAllDrives': True})
-    return drive_file['id']
-
-# ---------------------------------------------------------------------
-# 2. Download DB on startup
-# ---------------------------------------------------------------------
-file_obj = download_db_from_drive()
-
-# ---------------------------------------------------------------------
-# 3. Connect to the local DB
-# ---------------------------------------------------------------------
-conn = db.connect_to_database(str(LOCAL_DB_PATH))
 
 # ---------------------------------------------------------------------
 # 4. Password protection
@@ -173,7 +82,7 @@ if page == "Add Entry":
                 local_path = f"temp_images/{image.name}"
                 with open(local_path, "wb") as f:
                     f.write(image.getbuffer())
-                image_file_id = upload_image_to_drive(local_path, DRIVE_FOLDER_ID)
+                #image_file_id = upload_image_to_drive(local_path, DRIVE_FOLDER_ID)
             sentiment, mood = sf.get_sentiment(text)
             temperature, weather = wth.get_weather(LAT, LONG, WEATHER_API_KEY)
             jf.add_entry(LOCAL_DB_PATH, text, sentiment, mood, weather, temperature, image_file_id)
@@ -215,9 +124,9 @@ elif page == "View / Edit Entries":
                 if image_path:
                     # Download image from Drive temporarily for display
                     try:
-                        drive_file = DRIVE.CreateFile({'id': image_path})
+                        #drive_file = DRIVE.CreateFile({'id': image_path})
                         temp_image = f"temp_images/{eid}_{image_path}.jpg"
-                        drive_file.GetContentFile(temp_image)
+                        #drive_file.GetContentFile(temp_image)
                         st.image(temp_image, width=250)
                     except Exception:
                         st.warning("⚠️ Image could not be loaded.")
