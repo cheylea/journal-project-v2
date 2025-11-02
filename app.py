@@ -33,47 +33,51 @@ from functions.WeatherFunctions import WeatherFunctions as wth
 # Google Drive Authentication
 # ---------------------------------------------------------------------
 
-def init_drive_from_client_account():
-    """Authenticate with Google Drive using a personal OAuth2 client (from Streamlit secrets)."""
-    # Write client_secrets.json to a temporary file
-    creds_dict = {"installed": dict(st.secrets["google"]["installed"])}
-    with tempfile.NamedTemporaryFile(mode="w", delete=False, suffix=".json") as temp:
-        json.dump(creds_dict, temp)
-        temp.flush()
-        client_secrets_path = temp.name
+import os.path
+from google.oauth2.credentials import Credentials
+from google_auth_oauthlib.flow import InstalledAppFlow
+from google.auth.transport.requests import Request
+from googleapiclient.discovery import build
 
-    # Initialize GoogleAuth with your client credentials
-    gauth = GoogleAuth()
-    gauth.DEFAULT_SETTINGS['client_config_file'] = client_secrets_path
+# Adapted from https://www.merge.dev/blog/google-drive-api-python
+SCOPES = [
+    # Full, unrestricted access to the user's Drive (use with caution; requires restricted scope verification)
+    'https://www.googleapis.com/auth/drive',
+    # Per-file access to files created or opened with the app (recommended for most apps)
+    'https://www.googleapis.com/auth/drive.file',
+    # Read-only access to all Drive files
+    'https://www.googleapis.com/auth/drive.readonly',
+    # View and manage metadata of files in your Drive
+    'https://www.googleapis.com/auth/drive.metadata',
+    # View metadata for files in your Drive (read-only)
+    'https://www.googleapis.com/auth/drive.metadata.readonly',
+    # View and manage its own configuration data in your Google Drive
+    'https://www.googleapis.com/auth/drive.appdata',
+]
 
-    # Path to store OAuth tokens so user doesn’t need to reauthorize every time
-    token_file = "token.json"
-
-    if os.path.exists(token_file):
-        gauth.LoadCredentialsFile(token_file)
-        if gauth.access_token_expired:
-            gauth.Refresh()
+def get_drive_service():
+    creds = None
+    if os.path.exists('token.json'):
+        creds = Credentials.from_authorized_user_file('token.json', SCOPES)
+    if not creds or not creds.valid:
+        if creds and creds.expired and creds.refresh_token:
+            creds.refresh(Request())
         else:
-            gauth.Authorize()
-    else:
-        # First-time auth flow: opens a browser / prompts to log in
-        auth_url = gauth.GetAuthUrl()
-        st.write("Please authorize this app by visiting this URL:")
-        st.markdown(f"[Authorize Google Drive access]({auth_url})")
+            creds_dict = {"installed": dict(st.secrets["google"]["installed"])}
+            with tempfile.NamedTemporaryFile(mode="w", delete=False, suffix=".json") as temp:
+                json.dump(creds_dict, temp)
+                temp.flush()
+                client_secrets_path = temp.name
+            flow = InstalledAppFlow.from_client_secrets_file(client_secrets_path, SCOPES)
+            creds = flow.run_local_server(port=61204)
+        with open('token.json', 'w') as token:
+            token.write(creds.to_json())
+    return build('drive', 'v3', credentials=creds)
 
-        # Ask user to paste the code
-        auth_code = st.text_input("Enter the authorization code here:")
-        if auth_code:
-            gauth.Auth(auth_code)
-            gauth.SaveCredentialsFile(token_file)
-            st.success("Google Drive authorization complete!")
-
-    drive = GoogleDrive(gauth)
-    return drive
 # ---------------------------------------------------------------------
 # 1. Google Drive setup
 # ---------------------------------------------------------------------
-DRIVE = init_drive_from_client_account()
+DRIVE = get_drive_service()
 DRIVE_FOLDER_ID = "16f87Pusc7okePrUzeK6TYbh0MCfGvYIJ"
 DB_FILENAME = "journal.db"
 LOCAL_DB_PATH = Path("journal.db")
