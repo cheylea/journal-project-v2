@@ -70,6 +70,9 @@ def get_drive_service():
                 client_secrets_path = temp.name
             flow = InstalledAppFlow.from_client_secrets_file(client_secrets_path, SCOPES)
             creds = flow.run_local_server(port=61204)
+
+            gauth = GoogleAuth()
+            gauth.CommandLineAuth()
         with open('token.json', 'w') as token:
             token.write(creds.to_json())
     return build('drive', 'v3', credentials=creds)
