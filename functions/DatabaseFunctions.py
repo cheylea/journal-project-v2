@@ -20,7 +20,7 @@ class DatabaseFunctions:
         return conn
 
     # Execute SQL
-    def execute_sql(conn, sql):
+    def execute_sql(conn, sql, params=None):
         """Execute SQL to a sqlite database
 
         Key arguments
@@ -28,10 +28,13 @@ class DatabaseFunctions:
         sql -- string of sqlite code
         """
         c = conn.cursor()
-        c.execute(sql)
+        if params is not None:
+            c.execute(sql, params)
+        else:
+            c.execute(sql)
 
     # Execute SQL and fetch one result
-    def execute_sql_fetch_one(conn, sql):
+    def execute_sql_fetch_one(conn, sql, params=None):
         """Execute SQL to a sqlite database
         and fetch answer (one answer only)
 
@@ -40,7 +43,10 @@ class DatabaseFunctions:
         sql -- select string of sqlite code
         """
         c = conn.cursor()
-        c.execute(sql)
+        if params is not None:
+            c.execute(sql, params)
+        else:
+            c.execute(sql)
         result = c.fetchone()
         return result
 

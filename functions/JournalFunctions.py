@@ -9,21 +9,20 @@ from functions.DatabaseFunctions import DatabaseFunctions as db
 
 class JournalFunctions:
     # SQL Functions
-    def get_entries(database):
-        conn = db.connect_to_database(database)
+    def get_entries(conn):
         entries = db.execute_sql_fetch_all(
         conn,
         """
         SELECT EntryId, EntryDate, EntryText, Sentiment, Mood, Weather, 
-               Temperature, MostPlayedSong, TodaysGenre, ImagePath
+               Temperature, ImagePath
         FROM Entry
+        WHERE DateDeleted IS NULL
         ORDER BY EntryDate DESC
         """
         )
         return entries
 
-    def add_entry(database, text, sentiment, mood, weather, temperature, image_file_id=None):
-        conn = db.connect_to_database(database)
+    def add_entry(conn, entry_date, text, sentiment, mood, weather, temperature, image_path=None):
         now = datetime.now()
         db.execute_sql(
             conn,
@@ -32,12 +31,11 @@ class JournalFunctions:
                Temperature, ImagePath, DateCreated, DateModified)
             VALUES ( ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
-            (now.date(), text, sentiment, mood, weather, temperature, image_file_id, now, now)
+            (entry_date, text, sentiment, mood, weather, temperature, image_path, now, now)
         )
         return True
 
-    def update_entry(database, eid, text, sentiment, mood, weather, temperature, image_file_id=None):
-        conn = db.connect_to_database(database)
+    def update_entry(conn, eid, text, sentiment, mood, weather, temperature, image_path=None):
         now = datetime.now()
         db.execute_sql(
             conn,
@@ -47,12 +45,11 @@ class JournalFunctions:
                 Temperature = ?, ImagePath = ?, DateModified = ?
             WHERE EntryId = ?
             """,
-            (text, sentiment, mood, weather, temperature, image_file_id, now, eid)
+            (text, sentiment, mood, weather, temperature, image_path, now, eid)
         )
         return True
 
-    def delete_entry(database, eid):
-        conn = db.connect_to_database(database)
+    def delete_entry(conn, eid):
         now = datetime.now()
         db.execute_sql(
             conn,
@@ -64,3 +61,20 @@ class JournalFunctions:
             (now, now, eid)
         )
         return True
+    
+    def entry_exist(conn, entry_date):
+        date = db.execute_sql_fetch_one(
+        conn,
+        """
+        SELECT MAX(EntryDate)    
+        FROM Entry
+        WHERE EntryDate = ?
+        AND DateDeleted IS NULL;
+        """,
+            (entry_date)
+        )
+        print(date[0])
+        if date[0] is None:
+            return False
+        else:
+            return True
