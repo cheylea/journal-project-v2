@@ -4,21 +4,9 @@
 ### Imports
 import os
 import requests
-from dotenv import load_dotenv # for variables
-
-# Get tokens and ids from .env file
-load_dotenv()  # loads
-WeatherAPIKey = os.getenv('WeatherAPIKey')
-LAT = os.getenv('LAT')
-LONG = os.getenv('LONG')
 
 
-## Create journal tables
-absolute_path = os.path.dirname(__file__)
-directory_path = absolute_path.replace("\setup","")
-journal = os.path.join(directory_path, "databases", "journal.db")
-
-### Database Functions
+### Weather Functions
 
 class WeatherFunctions:
     def get_weather(lat, lon, WeatherAPIKey):
