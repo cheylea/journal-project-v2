@@ -165,11 +165,12 @@ elif page == "View / Edit Entries":
 # ---------------------------------------------------------------------
 elif page == "Dashboard":
     st.title("📈 Mood Dashboard")
-    df = pd.read_sql_query("SELECT * FROM Entry WHERE DateDeleted IS NULL", supabase)
+    entries = jf.get_entries(supabase)
 
-    if df.empty:
+    if not entries:
         st.info("No data yet to analyze.")
     else:
+        df = pd.DataFrame(entries)
         df["EntryDate"] = pd.to_datetime(df["EntryDate"])
         df.sort_values("EntryDate", inplace=True)
 
