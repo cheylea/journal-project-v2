@@ -3,8 +3,6 @@
 
 ### Imports
 from datetime import datetime
-from functions.DatabaseFunctions import DatabaseFunctions as db
-import supabase 
 
 ### Journal Functions
 
