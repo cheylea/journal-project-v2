@@ -5,7 +5,6 @@
 import os
 import requests
 from dotenv import load_dotenv # for variables
-import datetime as dt
 
 # Get tokens and ids from .env file
 load_dotenv()  # loads
