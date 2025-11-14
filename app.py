@@ -209,3 +209,9 @@ elif page == "Dashboard":
         plt.tight_layout()
 
         st.pyplot(fig)
+
+# TODO change colours and layout
+# TODO add a "home page" with some interesting stats
+# TODO improve the view/edit page to have a nice timeline of entries to scroll through
+# TODO set up the Steps API and ensure steps are being saved
+# TODO persist password login for a session and hide it once it has it
