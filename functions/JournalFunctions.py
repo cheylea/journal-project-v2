@@ -60,8 +60,12 @@ class JournalFunctions:
             "steps": steps
         }).execute()
 
-    def get_steps(supabase):
-        response = supabase.table("step").select("*").order("stepdate", desc=True).execute()
+    def get_steps(supabase, date):
+        response = supabase.table("step").select("steps").eq("stepdate", date).execute()
+        return response.data
+
+    def get_all_steps(supabase):
+        response = supabase.table("step").select("stepdate, steps").execute()
         return response.data
     
     def upload_image(supabase, file_path, file_name):
