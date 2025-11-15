@@ -13,7 +13,8 @@ from datetime import datetime
 # Dashboard Libraries
 from matplotlib import pyplot as plt
 import pandas as pd
-
+from wordcloud import WordCloud, STOPWORDS
+from matplotlib.colors import LinearSegmentedColormap
 
 # My Functions
 from functions.JournalFunctions import JournalFunctions as jf
@@ -21,49 +22,146 @@ from functions.SentimentFunctions import SentimentFunctions as sf
 from functions.WeatherFunctions import WeatherFunctions as wth
 
 # ---------------------------------------------------------------------
-# Database Setup
+# Theme Setup
 # ---------------------------------------------------------------------
 
+# Custom color map for word cloud
+# Theme Colours
+colors = ["#E2A9C2", "#4A2E54", "#253746", "#7B3357", "#6AD0FF"]
+# Create a custom colormap
+custom_cmap = LinearSegmentedColormap.from_list("custom_theme", colors)
+
+st.markdown(
+    """
+    <style>
+    /* Change the font for the entire app */
+    html, body, [class*="css"]  {
+        font-family: 'Courier New', monospace;
+    }
+    </style>
+    """,
+    unsafe_allow_html=True
+)
+
+# ---------------------------------------------------------------------
+# Environment Setup
+# ---------------------------------------------------------------------
+
+# Set working directory
 THIS_FOLDER = Path(__file__).parent.resolve()
 
+# Database connection
 from supabase import create_client, Client
-
 SUPABASE_URL = st.secrets["SUPABASE_URL"]
 SUPABASE_KEY = st.secrets["SUPABASE_KEY"] # anon key for read/write, or service role for secure API
-
 supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
 
-# ---------------------------------------------------------------------
-# 1. Password protection
-# ---------------------------------------------------------------------
-password = st.text_input("Enter password", type="password")
-if password != st.secrets["app_password"]:
-    st.stop()
-
-# ---------------------------------------------------------------------
-# 2. Sidebar navigation
-# ---------------------------------------------------------------------
-st.sidebar.title("🌿 Gratitude Journal")
-page = st.sidebar.radio("Go to", ["Add Entry", "View / Edit Entries", "Dashboard"])
-
-# ---------------------------------------------------------------------
-# 3. Add Entry
-# ---------------------------------------------------------------------
-
-# Required Attributes
+# Weather API setup
 LAT = st.secrets["LAT"]
 LONG = st.secrets["LONG"]
 WEATHER_API_KEY = st.secrets['WeatherAPIKey']
 
-if page == "Add Entry":
-    st.title("✨ Add a Gratitude Entry")
+# ---------------------------------------------------------------------
+# 1. Password protection
+# ---------------------------------------------------------------------
+# Initialize session state variable
+if "authenticated" not in st.session_state:
+    st.session_state.authenticated = False
+
+# If not yet authenticated, show password field
+if not st.session_state.authenticated:
+    password = st.text_input("Enter password", type="password")
+
+    if password:
+        if password == st.secrets["app_password"]:
+            st.session_state.authenticated = True
+            st.rerun()   # refresh to hide password field
+        else:
+            st.error("❌ Incorrect password!")
+            st.stop()
+    
+    else:
+        st.stop()  # wait for password input
+
+
+
+# ---------------------------------------------------------------------
+# 2. Sidebar navigation
+# ---------------------------------------------------------------------
+st.set_page_config(page_title="Gratitude Journal", page_icon="🌸", layout="centered")
+page = st.sidebar.radio("Find your way around! 🗺️", ["Home", "Add Entry", "Timeline", "Edit Entries", "Dashboard"])
+
+# ---------------------------------------------------------------------
+# 3. Home Page
+# ---------------------------------------------------------------------
+if page == "Home":
+    st.title("🌸 What are your grateful for?")
+    st.markdown("*Make now always the most precious time. Now will never come again. - Jean-Luc Picard*")
+
+    entries = jf.get_entries(supabase)
+    df = pd.DataFrame(entries)
+    
+    if not entries:
+        st.info("No entries yet. Add one from the 'Add Entry' tab.")
+    else:
+        for entry in entries:
+            date = entry["entrydate"]
+            text = entry["entrytext"]
+            sentiment = entry["sentiment"]
+            mood = entry["mood"]
+            weather = entry["weather"]
+            temp = entry["temperature"]
+            image_path = entry["imagepath"]
+
+            # Word cloud of entries
+            # Combine all text entries
+            text = ' '.join(df['entrytext'].dropna().tolist())
+            text = text.replace("’", "'")  # normalize curly apostrophes
+            text = text.replace("'", "")   # strip all apostrophes
+
+            # Add stop words
+            custom_stopwords = STOPWORDS.union({
+            'today', 'really', 'just', 'like', 'one', 'something', 'got',
+            'feel', 'felt', 'time', 'day', 'much', 'make', 'made', 'wasn'
+            't', 's', 'm', 've', 'll',
+            "dont", "cant", "wont", "im", "youre", "hes", "shes", "its", "were", "theyre",
+            "wasnt", "werent", "isnt", "arent", "havent", "hasnt", "hadnt", "id", "youd",
+            "hed", "shed", "wed", "theyd", "ill", "youll", "hell", "shell", "well", "theyll",
+            "ive", "youve", "weve", "theyve", "whod", "wholl", "whos", "shouldnt", "wouldnt",
+            "couldnt", "mightnt", "mustnt", "neednt", "aint"
+            })
+
+            # WordCloud with your theme
+            wordcloud = WordCloud(
+                width=600, height=300,
+                background_color="#F3D9E5",  # match your background if you want
+                colormap=custom_cmap,
+                stopwords=custom_stopwords
+            ).generate(text)
+
+            st.image(wordcloud.to_array())
+
+            # Gallery of images
+            if image_path:
+                signed_url = supabase.storage.from_("journal-images").create_signed_url(
+                    image_path,
+                    expires_in=3600  # 1 hour
+                )["signedURL"]
+
+                st.image(signed_url, width=150)
+            
+# ---------------------------------------------------------------------
+# 4. Add an Entry
+# ---------------------------------------------------------------------
+elif page == "Add Entry":
+    st.title("🌞 Add a Gratitude Entry")
     
     with st.form("entry_form", clear_on_submit=True):
         now = datetime.now().date()
         now_str = now.strftime("%Y-%m-%d")
         entry_exist = jf.entry_exist(supabase, (now_str,))
         if entry_exist:
-            st.warning("An entry for this date already exists. Please edit it in the 'View / Edit Entries' tab.")
+            st.warning("⚠️ An entry for this date already exists. Please edit it in the 'View / Edit Entries' tab.")
             st.form_submit_button("Try Again")
         else:
             text = st.text_area("What are you grateful for today? (Name at last one small thing, on thing you did for your health, and one thing you did for someone else.)", height=200)
@@ -91,13 +189,69 @@ if page == "Add Entry":
                 sentiment, mood = sf.get_sentiment(text)
                 temperature, weather = wth.get_weather(LAT, LONG, WEATHER_API_KEY)
                 jf.add_entry(supabase, now_str, text, sentiment, mood, weather, temperature, image_path)
-                st.success("Entry saved!")
+                st.success("✅ Entry saved!")
 
 # ---------------------------------------------------------------------
-# 4. View / Edit Entries
+# 5. Timeline of Entries
 # ---------------------------------------------------------------------
-elif page == "View / Edit Entries":
-    st.title("📔 Your Entries")
+elif page == "Timeline":
+    st.title("📅 Timeline")
+    entries = jf.get_entries(supabase)
+    
+    if not entries:
+        st.info("No entries yet. Add one from the 'Add Entry' tab.")
+    else:
+        for entry in entries:
+            date = entry["entrydate"]
+            text = entry["entrytext"]
+            sentiment = entry["sentiment"]
+            mood = entry["mood"]
+            weather = entry["weather"]
+            temp = entry["temperature"]
+            image_path = entry["imagepath"]
+
+            with st.expander(f"{str(date)[:10]}", expanded=True):
+                weather_image = ""
+                if "clear sky" in weather or "sun" in weather:
+                    weather_image = "☀️"
+                elif "thunder" in weather:
+                    weather_image = "🌩️"
+                elif "rain" in weather:
+                    weather_image = "🌧️"
+                elif "drizzle" in weather:
+                    weather_image = "🌦️"
+                elif "snow" in weather:
+                    weather_image = "❄️"
+                elif "clouds" in weather and "overcast" not in weather:
+                    weather_image = "⛅"
+                else:
+                    weather_image = "☁️"
+
+                st.write(f"**Mood:** {mood} ({sentiment}) ● **Weather:** {weather_image} ({temp}°C) ● **Steps**: N/A")
+
+                if image_path:
+                    col_text, col_image = st.columns([4, 2])
+                    with col_text:
+                        st.write(f"{text}")
+                    
+                    with col_image:
+                        try:
+                            signed_url = supabase.storage.from_("journal-images").create_signed_url(
+                                image_path,
+                                expires_in=3600  # 1 hour
+                            )["signedURL"]
+    
+                            st.image(signed_url, width=300)
+                        except Exception:
+                            st.warning("⚠️ Image could not be loaded.")
+                else:
+                    st.write(f"**Entry Text:** {text}")
+
+# ---------------------------------------------------------------------
+# 6. Edit Entries
+# ---------------------------------------------------------------------
+elif page == "Edit Entries":
+    st.title("📔 Edit Entries")
     entries = jf.get_entries(supabase)
     
     if not entries:
@@ -113,7 +267,7 @@ elif page == "View / Edit Entries":
             temp = entry["temperature"]
             image_path = entry["imagepath"]
 
-            with st.expander(f"{str(date)[:10]} — Mood: {mood}/5"):
+            with st.expander(f"{str(date)[:10]}", expanded=False):
                 new_text = st.text_area("Edit text", text, key=f"text_{eid}")
                 new_image = st.file_uploader("Change picture (optional)", type=["jpg", "jpeg", "png"], key=f"image_{eid}")
                 new_image_path = None
@@ -141,12 +295,12 @@ elif page == "View / Edit Entries":
                         new_sentiment, new_mood = sf.get_sentiment(new_text)
                         new_temperature, new_weather = wth.get_weather(LAT, LONG, WEATHER_API_KEY)
                         jf.update_entry(supabase, eid, new_text, new_sentiment, new_mood, new_weather, new_temperature, new_image_path)
-                        st.success("Updated!")
+                        st.success("✅ Updated!")
                         st.rerun()
                 with cols[1]:
                     if st.button("🗑️ Delete entry", key=f"delete_{eid}"):
                         jf.delete_entry(supabase, eid)
-                        st.warning("Deleted.")
+                        st.warning("⚠️ Deleted.")
                         st.rerun()
                 if image_path:
                     try:
@@ -161,26 +315,26 @@ elif page == "View / Edit Entries":
                         st.warning("⚠️ Image could not be loaded.")
 
 # ---------------------------------------------------------------------
-# 5. Dashboard
+# 7. Statistics Dashboard
 # ---------------------------------------------------------------------
-elif page == "Dashboard":
-    st.title("📈 Mood Dashboard")
+elif page == "Statistics":
+    st.title("📈 Statistics")
     entries = jf.get_entries(supabase)
 
     if not entries:
         st.info("No data yet to analyze.")
     else:
         df = pd.DataFrame(entries)
-        df["EntryDate"] = pd.to_datetime(df["EntryDate"])
-        df.sort_values("EntryDate", inplace=True)
+        df["entrydate"] = pd.to_datetime(df["entrydate"])
+        df.sort_values("entrydate", inplace=True)
 
         # convert types
-        df["Sentiment"] = pd.to_numeric(df["Sentiment"], errors="coerce")
-        df["Temperature"] = pd.to_numeric(df["Temperature"], errors="coerce")
+        df["sentiment"] = pd.to_numeric(df["sentiment"], errors="coerce")
+        df["temperature"] = pd.to_numeric(df["temperature"], errors="coerce")
 
         # group by date
-        daily_mood = df.groupby(df["EntryDate"].dt.date)["Sentiment"].mean()
-        daily_temp = df.groupby(df["EntryDate"].dt.date)["Temperature"].mean()
+        daily_mood = df.groupby(df["entrydate"].dt.date)["sentiment"].mean()
+        daily_temp = df.groupby(df["entrydate"].dt.date)["temperature"].mean()
 
         st.subheader("Mood + Temperature Over Time")
 
@@ -196,10 +350,10 @@ elif page == "Dashboard":
         # Draw zero line for sentiment
         ax1.axhline(0, color='gray', linestyle='--', linewidth=1)
 
-        # Temperature (right axis)
+        # temperature (right axis)
         ax2 = ax1.twinx()
-        ax2.plot(daily_temp.index, daily_temp.values, marker="s", color="red", label="Temperature")
-        ax2.set_ylabel("Average Temperature (°C)", color="red")
+        ax2.plot(daily_temp.index, daily_temp.values, marker="s", color="red", label="temperature")
+        ax2.set_ylabel("Average temperature (°C)", color="red")
         ax2.set_ylim(-5, 35)  # UK temperature range
         ax2.tick_params(axis='y', labelcolor="red")
 
@@ -214,4 +368,4 @@ elif page == "Dashboard":
 # TODO add a "home page" with some interesting stats
 # TODO improve the view/edit page to have a nice timeline of entries to scroll through
 # TODO set up the Steps API and ensure steps are being saved
-# TODO persist password login for a session and hide it once it has it
+# TODO improve graphs
