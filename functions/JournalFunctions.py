@@ -54,7 +54,7 @@ class JournalFunctions:
         else:
             return False
         
-    def add_steps(supabase,step_date, steps):
+    def add_steps(supabase, step_date, steps):
         supabase.table("step").insert({
             "stepdate": step_date,
             "steps": steps
