@@ -201,6 +201,7 @@ elif page == "Timeline":
     if not entries:
         st.info("No entries yet. Add one from the 'Add Entry' tab.")
     else:
+        print(entries)
         for entry in entries:
             date = entry["entrydate"]
             text = entry["entrytext"]
@@ -209,6 +210,7 @@ elif page == "Timeline":
             weather = entry["weather"]
             temp = entry["temperature"]
             image_path = entry["imagepath"]
+            steps = entry["step"]["steps"] if entry.get("step") else "N/A"
 
             with st.expander(f"{str(date)[:10]}", expanded=True):
                 weather_image = ""
@@ -227,7 +229,7 @@ elif page == "Timeline":
                 else:
                     weather_image = "☁️"
 
-                st.write(f"**Mood:** {mood} ({sentiment}) ● **Weather:** {weather_image} ({temp}°C) ● **Steps**: N/A")
+                st.write(f"**Mood:** {mood} ({sentiment}) ● **Weather:** {weather_image} ({temp}°C) ● **Steps**: {steps}")
 
                 if image_path:
                     col_text, col_image = st.columns([4, 2])
@@ -266,6 +268,7 @@ elif page == "Edit Entries":
             weather = entry["weather"]
             temp = entry["temperature"]
             image_path = entry["imagepath"]
+            steps = entry["steps"]
 
             with st.expander(f"{str(date)[:10]}", expanded=False):
                 new_text = st.text_area("Edit text", text, key=f"text_{eid}")

@@ -9,7 +9,13 @@ from datetime import datetime
 class JournalFunctions:
     # Get list of journal entries
     def get_entries(supabase):
-        response = supabase.table("entry").select("*").is_("datedeleted", None).order("entrydate", desc=True).execute()
+        response = (
+        supabase.table("entry")
+        .select("*, step!inner(steps)")
+        .is_("datedeleted", None)
+        .order("entrydate", desc=True)
+        .execute()
+        )
         return response.data
     
     # Add a new journal entry
