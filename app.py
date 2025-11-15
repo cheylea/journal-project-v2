@@ -268,7 +268,7 @@ elif page == "Edit Entries":
             weather = entry["weather"]
             temp = entry["temperature"]
             image_path = entry["imagepath"]
-            steps = entry["steps"]
+            steps = entry["step"]["steps"] if entry.get("step") else "N/A"
 
             with st.expander(f"{str(date)[:10]}", expanded=False):
                 new_text = st.text_area("Edit text", text, key=f"text_{eid}")
