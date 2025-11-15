@@ -89,7 +89,7 @@ if not st.session_state.authenticated:
 # 2. Sidebar navigation
 # ---------------------------------------------------------------------
 st.set_page_config(page_title="Gratitude Journal", page_icon="🌸", layout="centered")
-page = st.sidebar.radio("Find your way around! 🗺️", ["Home", "Add Entry", "Timeline", "Edit Entries", "Dashboard"])
+page = st.sidebar.radio("Find your way around! 🗺️", ["Home", "Add Entry", "Timeline", "Edit Entries", "Statistics"])
 
 # ---------------------------------------------------------------------
 # 3. Home Page
