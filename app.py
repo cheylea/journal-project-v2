@@ -306,7 +306,6 @@ elif page == "Edit Entries":
                         st.rerun()
                 if image_path:
                     try:
-                        print(image_path)
                         signed_url = supabase.storage.from_("journal-images").create_signed_url(
                             image_path,
                             expires_in=3600  # 1 hour
