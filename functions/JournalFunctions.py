@@ -27,7 +27,7 @@ class JournalFunctions:
         for e in entries:
             e["steps"] = steps_map.get(e["entrydate"])
 
-        return entries.data
+        return entries
     
     # Add a new journal entry
     def add_entry(supabase, entry_date, text, sentiment, mood, weather, temperature, image_path=None):
