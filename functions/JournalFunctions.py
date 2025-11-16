@@ -9,14 +9,25 @@ from datetime import datetime
 class JournalFunctions:
     # Get list of journal entries
     def get_entries(supabase):
-        response = (
-        supabase.table("entry")
-        .select("*, step!inner(steps)")
-        .is_("datedeleted", None)
-        .order("entrydate", desc=True)
-        .execute()
+        # Fetch all entries
+        entries = (
+            supabase.table("entry")
+            .select("*")
+            .is_("datedeleted", None)
+            .order("entrydate", desc=True)
+            .execute()
+            .data
         )
-        return response.data
+
+        # Fetch all steps
+        steps = supabase.table("step").select("stepdate, steps").execute().data
+        steps_map = {s["stepdate"]: s["steps"] for s in steps}
+
+        # Join manually
+        for e in entries:
+            e["steps"] = steps_map.get(e["entrydate"])
+
+        return entries.data
     
     # Add a new journal entry
     def add_entry(supabase, entry_date, text, sentiment, mood, weather, temperature, image_path=None):
