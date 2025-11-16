@@ -201,7 +201,6 @@ elif page == "Timeline":
     if not entries:
         st.info("No entries yet. Add one from the 'Add Entry' tab.")
     else:
-        print(entries)
         for entry in entries:
             date = entry["entrydate"]
             text = entry["entrytext"]
