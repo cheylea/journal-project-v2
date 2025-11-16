@@ -27,21 +27,23 @@ from functions.WeatherFunctions import WeatherFunctions as wth
 
 # Custom color map for word cloud
 # Theme Colours
-colors = ["#E2A9C2", "#4A2E54", "#253746", "#7B3357", "#6AD0FF"]
+colors = ["#E2A9C2", "#4A2E54", "#253746", "#7B3357", "#CED9E5"]
 # Create a custom colormap
 custom_cmap = LinearSegmentedColormap.from_list("custom_theme", colors)
 
-st.markdown(
-    """
-    <style>
-    /* Change the font for the entire app */
-    html, body, [class*="css"]  {
-        font-family: 'Courier New', monospace;
-    }
-    </style>
-    """,
-    unsafe_allow_html=True
-)
+st.markdown("""
+<style>
+/* Apply your font to all regular text elements, but NOT to icon fonts */
+html, body, [data-testid="stAppViewContainer"], [data-testid="stMarkdownContainer"] * {
+    font-family: 'Courier New', monospace !important;
+}
+
+/* Keep Streamlit’s Material Icons working */
+[class^="material-icons"], [class*="material-icons"] {
+    font-family: 'Material Icons' !important;
+}
+</style>
+""", unsafe_allow_html=True)
 
 # ---------------------------------------------------------------------
 # Environment Setup
@@ -89,67 +91,69 @@ if not st.session_state.authenticated:
 # 2. Sidebar navigation
 # ---------------------------------------------------------------------
 st.set_page_config(page_title="Gratitude Journal", page_icon="🌸", layout="centered")
-page = st.sidebar.radio("Find your way around! 🗺️", ["Home", "Add Entry", "Timeline", "Edit Entries", "Statistics"])
+st.sidebar.title('Where to?')
+page = st.sidebar.radio("Use below to navigate", ["Home", "Add Entry", "Timeline", "Edit Entries", "Statistics"])
 
 # ---------------------------------------------------------------------
 # 3. Home Page
 # ---------------------------------------------------------------------
 if page == "Home":
-    st.title("🌸 What are your grateful for?")
+    st.title("🌸 What are you grateful for?")
     st.markdown("*Make now always the most precious time. Now will never come again. - Jean-Luc Picard*")
 
     entries = jf.get_entries(supabase)
     df = pd.DataFrame(entries)
-    
     if not entries:
         st.info("No entries yet. Add one from the 'Add Entry' tab.")
     else:
+        #Word cloud of entries
+        # Combine all text entries
+        text = ' '.join(df['entrytext'].dropna().tolist())
+        text = text.replace("’", "'")  # normalise curly apostrophes
+        text = text.replace("'", "")   # strip all apostrophes
+        # Add stop words
+        custom_stopwords = STOPWORDS.union({
+        'today', 'really', 'just', 'like', 'one', 'something', 'got',
+        'feel', 'felt', 'time', 'day', 'much', 'make', 'made', 'wasn'
+        't', 's', 'm', 've', 'll',
+        "dont", "cant", "wont", "im", "youre", "hes", "shes", "its", "were", "theyre",
+        "wasnt", "werent", "isnt", "arent", "havent", "hasnt", "hadnt", "id", "youd",
+        "hed", "shed", "wed", "theyd", "ill", "youll", "hell", "shell", "well", "theyll",
+        "ive", "youve", "weve", "theyve", "whod", "wholl", "whos", "shouldnt", "wouldnt",
+        "couldnt", "mightnt", "mustnt", "neednt", "aint", "grateful", "someone else", "health",
+        "still"
+        })
+
+        # WordCloud with your theme
+        wordcloud = WordCloud(
+            width=600, height=300,
+            background_color="#F3D9E5",  # match your background if you want
+            colormap=custom_cmap,
+            stopwords=custom_stopwords
+        ).generate(text)
+        st.image(wordcloud.to_array())
+
+        # Gallery of images
+        all_images = []
+        cols_per_row = 4
+        # Loop to retrieve images
         for entry in entries:
-            date = entry["entrydate"]
-            text = entry["entrytext"]
-            sentiment = entry["sentiment"]
-            mood = entry["mood"]
-            weather = entry["weather"]
-            temp = entry["temperature"]
             image_path = entry["imagepath"]
-
-            # Word cloud of entries
-            # Combine all text entries
-            text = ' '.join(df['entrytext'].dropna().tolist())
-            text = text.replace("’", "'")  # normalize curly apostrophes
-            text = text.replace("'", "")   # strip all apostrophes
-
-            # Add stop words
-            custom_stopwords = STOPWORDS.union({
-            'today', 'really', 'just', 'like', 'one', 'something', 'got',
-            'feel', 'felt', 'time', 'day', 'much', 'make', 'made', 'wasn'
-            't', 's', 'm', 've', 'll',
-            "dont", "cant", "wont", "im", "youre", "hes", "shes", "its", "were", "theyre",
-            "wasnt", "werent", "isnt", "arent", "havent", "hasnt", "hadnt", "id", "youd",
-            "hed", "shed", "wed", "theyd", "ill", "youll", "hell", "shell", "well", "theyll",
-            "ive", "youve", "weve", "theyve", "whod", "wholl", "whos", "shouldnt", "wouldnt",
-            "couldnt", "mightnt", "mustnt", "neednt", "aint"
-            })
-
-            # WordCloud with your theme
-            wordcloud = WordCloud(
-                width=600, height=300,
-                background_color="#F3D9E5",  # match your background if you want
-                colormap=custom_cmap,
-                stopwords=custom_stopwords
-            ).generate(text)
-
-            st.image(wordcloud.to_array())
-
-            # Gallery of images
             if image_path:
                 signed_url = supabase.storage.from_("journal-images").create_signed_url(
                     image_path,
                     expires_in=3600  # 1 hour
                 )["signedURL"]
+                all_images.append(signed_url)
 
-                st.image(signed_url, width=150)
-            
+        # Display images in a grid
+        for i in range(0, len(all_images), cols_per_row):
+            cols = st.columns(cols_per_row)
+            for j, col in enumerate(cols):
+                if i + j < len(all_images):
+                    img_path = all_images[i + j]
+                    col.image(img_path, use_container_width=True)
+
 # ---------------------------------------------------------------------
 # 4. Add an Entry
 # ---------------------------------------------------------------------
@@ -209,7 +213,7 @@ elif page == "Timeline":
             weather = entry["weather"]
             temp = entry["temperature"]
             image_path = entry["imagepath"]
-            steps = entry["step"]["steps"] if entry.get("step") else "N/A"
+            steps = entry["steps"]
 
             with st.expander(f"{str(date)[:10]}", expanded=True):
                 weather_image = ""
@@ -267,7 +271,7 @@ elif page == "Edit Entries":
             weather = entry["weather"]
             temp = entry["temperature"]
             image_path = entry["imagepath"]
-            steps = entry["step"]["steps"] if entry.get("step") else "N/A"
+            steps = entry["steps"]
 
             with st.expander(f"{str(date)[:10]}", expanded=False):
                 new_text = st.text_area("Edit text", text, key=f"text_{eid}")
@@ -332,38 +336,74 @@ elif page == "Statistics":
         # convert types
         df["sentiment"] = pd.to_numeric(df["sentiment"], errors="coerce")
         df["temperature"] = pd.to_numeric(df["temperature"], errors="coerce")
+        df["steps"] = pd.to_numeric(df["steps"], errors="coerce")
 
         # group by date
         daily_mood = df.groupby(df["entrydate"].dt.date)["sentiment"].mean()
         daily_temp = df.groupby(df["entrydate"].dt.date)["temperature"].mean()
+        daily_steps = df.groupby(df["entrydate"].dt.date)["steps"].mean()
 
-        st.subheader("Mood + Temperature Over Time")
+        # Normalise for combined graph
+        def Normalise(series):
+            return (series - series.min()) / (series.max() - series.min())
 
-        fig, ax1 = plt.subplots(figsize=(10, 5))
+        mood_norm = Normalise(daily_mood)
+        temp_norm = Normalise(daily_temp)
+        steps_norm = Normalise(daily_steps)
 
-        # Mood (left axis)
-        ax1.plot(daily_mood.index, daily_mood.values, marker="o", color="blue", label="Mood")
-        ax1.set_ylabel("Average Mood", color="blue")
-        ax1.set_ylim(-1, 1)  # sentiment range
-        ax1.tick_params(axis='y', labelcolor="blue")
-        ax1.grid(True)
+        # -----------------------
+        # Combined Normalised graph
+        # -----------------------
+        st.subheader("Mood, Temperature, and Steps Over Time (Normalised)")
 
-        # Draw zero line for sentiment
-        ax1.axhline(0, color='gray', linestyle='--', linewidth=1)
-
-        # temperature (right axis)
-        ax2 = ax1.twinx()
-        ax2.plot(daily_temp.index, daily_temp.values, marker="s", color="red", label="temperature")
-        ax2.set_ylabel("Average temperature (°C)", color="red")
-        ax2.set_ylim(-5, 35)  # UK temperature range
-        ax2.tick_params(axis='y', labelcolor="red")
-
-        # Rotate x-axis labels vertically and keep them under the plot
+        fig, ax = plt.subplots(figsize=(10, 5))
+        ax.plot(mood_norm.index, mood_norm.values, marker="o", color="#4A2E54", label="Mood")
+        ax.plot(temp_norm.index, temp_norm.values, marker="o", color="#7B3357", label="Temperature")
+        ax.plot(steps_norm.index, steps_norm.values, marker="o", color="#E2A9C2", label="Steps")
+        ax.set_ylabel("Normalised Value (0-1)")
+        ax.set_xlabel("Date")
+        ax.set_title("Trends Over Time")
+        ax.legend()
+        ax.grid(True)
         plt.xticks(rotation=90)
-        plt.xlabel("Date")
         plt.tight_layout()
-
         st.pyplot(fig)
 
-# TODO set up the Steps API and ensure steps are being saved
+        # -----------------------
+        # Individual graphs
+        # -----------------------
+        st.subheader("Mood Over Time")
+        fig, ax = plt.subplots(figsize=(10, 3))
+        ax.plot(daily_mood.index, daily_mood.values, marker="o", color="#4A2E54")
+        ax.set_ylabel("Average Mood")
+        ax.set_xlabel("Date")
+        ax.set_ylim(-1, 1)
+        ax.grid(True)
+        plt.xticks(rotation=90)
+        plt.tight_layout()
+        st.pyplot(fig)
+
+        st.subheader("Temperature Over Time")
+        fig, ax = plt.subplots(figsize=(10, 3))
+        ax.plot(daily_temp.index, daily_temp.values, marker="o", color="#7B3357")
+        ax.set_ylabel("Average Temperature (°C)")
+        ax.set_xlabel("Date")
+        ax.set_ylim(daily_temp.min() - 5, daily_temp.max() + 5)
+        ax.grid(True)
+        plt.xticks(rotation=90)
+        plt.tight_layout()
+        st.pyplot(fig)
+
+        st.subheader("Steps Over Time")
+        fig, ax = plt.subplots(figsize=(10, 3))
+        ax.plot(daily_steps.index, daily_steps.values, marker="o", color="#E2A9C2")
+        ax.set_ylabel("Average Steps")
+        ax.set_xlabel("Date")
+        ax.set_ylim(daily_steps.min() - 500, daily_steps.max() + 500)
+        ax.grid(True)
+        plt.xticks(rotation=90)
+        plt.tight_layout()
+        st.pyplot(fig)
+
+
 # TODO improve graphs
