@@ -121,7 +121,8 @@ if page == "Home":
         "hed", "shed", "wed", "theyd", "ill", "youll", "hell", "shell", "well", "theyll",
         "ive", "youve", "weve", "theyve", "whod", "wholl", "whos", "shouldnt", "wouldnt",
         "couldnt", "mightnt", "mustnt", "neednt", "aint", "grateful", "someone else", "health",
-        "still"
+        "still", "someone", "thing", "things", "also", "even", "way", "ways",
+        "bit"
         })
 
         # WordCloud with your theme
