@@ -6,7 +6,7 @@ Repository for a light-weight app to record a daily gratitude entry alongside ot
 ![Supabase](https://img.shields.io/badge/supabase-integrated-green.svg)
 ![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)
 
-![App Screenshot](static\App-Screenshot.png)
+![App Screenshot](static/App-Screenshot.png)
 
 ## Contents
 - [Overview](#overview)
@@ -117,12 +117,12 @@ If you want to incorporate automated steps for your journal entry, you can do th
 Clone the [Steps API](https://github.com/cheylea/journal-project-v2-steps-api) small repository that I have created. Use Railway or something similar to deploy this repository and create a live end point. More information [here](https://docs.railway.com/quick-start).
 
 You can then create a shortcut on your iOS device with the following set up:
-![Shorcut setup 1](static\IMG_6144.png)
-![Shortcut setup 2](static\IMG_6145.png)
+![Shorcut setup 1](static/IMG_6144.png)
+![Shortcut setup 2](static/IMG_6145.png)
 
 And finally set up an automation like so:
 
-![Automation setup](static\IMG_6146.png)
+![Automation setup](static/IMG_6146.png)
 
 # Usage
 
