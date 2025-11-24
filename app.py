@@ -25,20 +25,20 @@ from functions.WeatherFunctions import WeatherFunctions as wth
 # Theme Setup
 # ---------------------------------------------------------------------
 
-# Custom color map for word cloud
 # Theme Colours
 colors = ["#E2A9C2", "#4A2E54", "#253746", "#7B3357", "#CED9E5"]
-# Create a custom colormap
+# Custom color map for word cloud
 custom_cmap = LinearSegmentedColormap.from_list("custom_theme", colors)
 
+# Custom theme adjustments
 st.markdown("""
 <style>
-/* Apply your font to all regular text elements, but NOT to icon fonts */
+/* Apply font to all regular text elements, but NOT to icon fonts */
 html, body, [data-testid="stAppViewContainer"], [data-testid="stMarkdownContainer"] * {
     font-family: 'Courier New', monospace !important;
 }
 
-/* Keep Streamlit’s Material Icons working */
+/* Keep Streamlit Material Icons working */
 [class^="material-icons"], [class*="material-icons"] {
     font-family: 'Material Icons' !important;
 }
@@ -52,7 +52,7 @@ html, body, [data-testid="stAppViewContainer"], [data-testid="stMarkdownContaine
 # Set working directory
 THIS_FOLDER = Path(__file__).parent.resolve()
 
-# Database connection
+# Supabase Database connection
 from supabase import create_client, Client
 SUPABASE_URL = st.secrets["SUPABASE_URL"]
 SUPABASE_KEY = st.secrets["SUPABASE_KEY"] # anon key for read/write, or service role for secure API
@@ -66,15 +66,17 @@ WEATHER_API_KEY = st.secrets['WeatherAPIKey']
 # ---------------------------------------------------------------------
 # 1. Password protection
 # ---------------------------------------------------------------------
-# Initialize session state variable
+
+# Initialise session variable as not authenticated
 if "authenticated" not in st.session_state:
     st.session_state.authenticated = False
 
-# If not yet authenticated, show password field
+# If not yet authenticated, show password field (and do not load rest of app)
 if not st.session_state.authenticated:
     password = st.text_input("Enter password", type="password")
 
     if password:
+        # Check password and authenticate if a match
         if password == st.secrets["app_password"]:
             st.session_state.authenticated = True
             st.rerun()   # refresh to hide password field
@@ -90,25 +92,31 @@ if not st.session_state.authenticated:
 # ---------------------------------------------------------------------
 # 2. Sidebar navigation
 # ---------------------------------------------------------------------
+
+# Put together title for page
 st.set_page_config(page_title="Gratitude Journal", page_icon="🌸", layout="centered")
+# Configure sidebar
 st.sidebar.title('Where to?')
 page = st.sidebar.radio("Use below to navigate", ["Home", "Add Entry", "Timeline", "Edit Entries", "Statistics"])
 
 # ---------------------------------------------------------------------
 # 3. Home Page
 # ---------------------------------------------------------------------
+
 if page == "Home":
     st.title("🌸 What are you grateful for?")
     st.markdown("*Make now always the most precious time. Now will never come again. - Jean-Luc Picard*")
 
     entries = jf.get_entries(supabase)
     df = pd.DataFrame(entries)
+
+    # Display message if no entries
     if not entries:
         st.info("No entries yet. Add one from the 'Add Entry' tab.")
+    # Otherwise display word cloud and image gallery
     else:
-        #Word cloud of entries
-        # Combine all text entries
-        text = ' '.join(df['entrytext'].dropna().tolist())
+        # Create word cloud of entries
+        text = ' '.join(df['entrytext'].dropna().tolist()) # combine all text entries
         text = text.replace("’", "'")  # normalise curly apostrophes
         text = text.replace("'", "")   # strip all apostrophes
         # Add stop words
@@ -122,13 +130,13 @@ if page == "Home":
         "ive", "youve", "weve", "theyve", "whod", "wholl", "whos", "shouldnt", "wouldnt",
         "couldnt", "mightnt", "mustnt", "neednt", "aint", "grateful", "someone else", "health",
         "still", "someone", "thing", "things", "also", "even", "way", "ways",
-        "bit"
+        "bit", "little", "lot", "lots", "part", "parts", "think", "know"
         })
 
-        # WordCloud with your theme
+        # Generate word cloud with custom theme
         wordcloud = WordCloud(
             width=600, height=300,
-            background_color="#F3D9E5",  # match your background if you want
+            background_color="#F3D9E5",
             colormap=custom_cmap,
             stopwords=custom_stopwords
         ).generate(text)
@@ -158,6 +166,7 @@ if page == "Home":
 # ---------------------------------------------------------------------
 # 4. Add an Entry
 # ---------------------------------------------------------------------
+
 elif page == "Add Entry":
     st.title("🌞 Add a Gratitude Entry")
     
@@ -165,15 +174,18 @@ elif page == "Add Entry":
         now = datetime.now().date()
         now_str = now.strftime("%Y-%m-%d")
         entry_exist = jf.entry_exist(supabase, (now_str,))
+        # Add a warning if an entry for the day already exists
         if entry_exist:
             st.warning("⚠️ An entry for this date already exists. Please edit it in the 'View / Edit Entries' tab.")
             st.form_submit_button("Try Again")
+        # Otherwise show add entry form
         else:
             text = st.text_area("What are you grateful for today? (Name at last one small thing, on thing you did for your health, and one thing you did for someone else.)", height=200)
             image = st.file_uploader("Add a picture (optional)", type=["jpg", "jpeg", "png"])
             image_path = None
             submitted = st.form_submit_button("Save Entry")
             if submitted and text.strip():
+                # Save image to Supabase Storage if provided
                 if image is not None:
                     # Compile unique filename
                     filename, ext = os.path.splitext(image.name)
@@ -191,9 +203,11 @@ elif page == "Add Entry":
                     # Get public URL so you can display and store it
                     image_path = image_name
 
+                # Get sentiment and weather data
                 sentiment, mood = sf.get_sentiment(text)
                 temperature, weather = wth.get_weather(LAT, LONG, WEATHER_API_KEY)
                 jf.add_entry(supabase, now_str, text, sentiment, mood, weather, temperature, image_path)
+                # Display success message
                 st.success("✅ Entry saved!")
 
 # ---------------------------------------------------------------------
@@ -203,8 +217,10 @@ elif page == "Timeline":
     st.title("📅 Timeline")
     entries = jf.get_entries(supabase)
     
+    # Display message if no entries
     if not entries:
         st.info("No entries yet. Add one from the 'Add Entry' tab.")
+    # Otherwise display entries for timeline
     else:
         for entry in entries:
             date = entry["entrydate"]
@@ -217,6 +233,7 @@ elif page == "Timeline":
             steps = entry["steps"]
 
             with st.expander(f"{str(date)[:10]}", expanded=True):
+                # Replace weather description with an emoji
                 weather_image = ""
                 if "clear sky" in weather or "sun" in weather:
                     weather_image = "☀️"
@@ -233,8 +250,10 @@ elif page == "Timeline":
                 else:
                     weather_image = "☁️"
 
+                # Compile subtitle of stats
                 st.write(f"**Mood:** {mood} ({sentiment}) ● **Weather:** {weather_image} ({temp}°C) ● **Steps**: {steps}")
 
+                # Display image if there is one with text side by side
                 if image_path:
                     col_text, col_image = st.columns([4, 2])
                     with col_text:
@@ -256,12 +275,15 @@ elif page == "Timeline":
 # ---------------------------------------------------------------------
 # 6. Edit Entries
 # ---------------------------------------------------------------------
+
 elif page == "Edit Entries":
     st.title("📔 Edit Entries")
     entries = jf.get_entries(supabase)
     
+    # Display message if no entries
     if not entries:
         st.info("No entries yet. Add one from the 'Add Entry' tab.")
+    # Otherwise display entries for editing
     else:
         for entry in entries:
             eid = entry["entryid"]
@@ -274,6 +296,7 @@ elif page == "Edit Entries":
             image_path = entry["imagepath"]
             steps = entry["steps"]
 
+            # Display with expander closed to make it easier to navigate
             with st.expander(f"{str(date)[:10]}", expanded=False):
                 new_text = st.text_area("Edit text", text, key=f"text_{eid}")
                 new_image = st.file_uploader("Change picture (optional)", type=["jpg", "jpeg", "png"], key=f"image_{eid}")
@@ -326,9 +349,10 @@ elif page == "Edit Entries":
 elif page == "Statistics":
     st.title("📈 Statistics")
     entries = jf.get_entries(supabase)
-
+    # Display message if no graphs or data to show
     if not entries:
         st.info("No data yet to analyze.")
+    # Otherwise display statistics
     else:
         df = pd.DataFrame(entries)
         df["entrydate"] = pd.to_datetime(df["entrydate"])
@@ -405,6 +429,3 @@ elif page == "Statistics":
         plt.xticks(rotation=90)
         plt.tight_layout()
         st.pyplot(fig)
-
-
-# TODO improve graphs

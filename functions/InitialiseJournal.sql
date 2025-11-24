@@ -1,5 +1,7 @@
 --Run this script to initialise the journal database schema in Supabase
+--https://supabase.com/
 
+--Table to hold saved entries
 create table entry (
   entryid bigserial primary key,
   entrydate date,
@@ -14,6 +16,7 @@ create table entry (
   datedeleted timestamptz
 );
 
+--Table to hold step count data
 create table step (
   stepid bigserial primary key,
   stepdate date,

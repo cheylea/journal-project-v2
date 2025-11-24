@@ -1,12 +1,24 @@
-streamlit>=1.25.0
-pandas>=2.0.0
-matplotlib>=3.7.0
-Pillow>=10.0.0
-textblob>=0.17.1
-nltk>=3.8.0
+# Core app frameworks
+streamlit>=1.37.0
+fastapi>=0.115.0
+uvicorn[standard]>=0.30.0
+
+# Supabase client
+supabase>=2.5.0
+
+# NLP and sentiment analysis
+nltk>=3.9.1
+
+# Data and visualization
+pandas>=2.2.0
+matplotlib>=3.9.0
+wordcloud>=1.9.3
+
+# HTTP requests
 requests>=2.31.0
-supabase>=2.4.3
-fastapi>=0.110.0
-uvicorn>=0.29.0
-pydantic>=2.0.0
-wordcloud
+
+# Validation / schema
+pydantic>=2.9.0
+
+# Optional (depending on deployment)
+python-dotenv>=1.0.1  # for .env file support if used locally

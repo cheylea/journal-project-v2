@@ -1,16 +1,18 @@
 #!/usr/bin/python3
-# Set of Python functions for interacting with the journal database
+# Set of Python functions for analysing sentiment of text inputs.
 
-### Imports
-
-
-### Sentiment Functions
+# Imports
 from nltk.sentiment import SentimentIntensityAnalyzer
 import nltk
 
-class SentimentFunctions:
 
+class SentimentFunctions:
+    @staticmethod
     def get_sentiment(text):
+        """ Analyse the sentiment of the given text using NLTK's VADER.
+
+        Args:
+            text: The text to analyse"""
         nltk.download('vader_lexicon', quiet=True)
         sia = SentimentIntensityAnalyzer()
         scores = sia.polarity_scores(text)
