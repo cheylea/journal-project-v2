@@ -38,7 +38,7 @@ class JournalFunctions:
         return entries
     
     # Add a new journal entry
-    def add_entry(supabase, entry_date, text, sentiment, mood, weather, temperature, image_path=None):
+    def add_entry(supabase, entry_date, text, sentiment, mood, weather, temperature, topic, image_path=None ):
         """ Add a new journal entry to the database.
 
         Args:
@@ -50,6 +50,7 @@ class JournalFunctions:
             weather: Weather description
             temperature: Temperature value
             image_path: Optional path to an associated image
+            topic: Identified topic for the entry
 
             To create a supabase client instance
             supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
@@ -61,12 +62,13 @@ class JournalFunctions:
             "mood": mood,
             "weather": weather,
             "temperature": temperature,
-            "imagepath": image_path
+            "imagepath": image_path,
+            "topic": topic
         }).execute()
         return True
     
 
-    def update_entry(supabase, eid, text, sentiment, mood, weather, temperature, image_path=None):
+    def update_entry(supabase, eid, text, sentiment, mood, weather, temperature, topic, image_path=None):
         """ Update an existing journal entry in the database.
 
         Args:
@@ -78,6 +80,7 @@ class JournalFunctions:
             weather: Updated weather description
             temperature: Updated temperature value
             image_path: Optional updated path to an associated image
+            topic: Identified topic for the entry
 
             To create a supabase client instance
             supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
@@ -90,6 +93,7 @@ class JournalFunctions:
             "weather": weather,
             "temperature": temperature,
             "imagepath": image_path,
+            "topic": topic,
             "datemodified": now
         }).eq("entryid", eid).execute()
         return True

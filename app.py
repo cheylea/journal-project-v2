@@ -64,28 +64,28 @@ LONG = st.secrets["LONG"]
 WEATHER_API_KEY = st.secrets['WeatherAPIKey']
 
 # ---------------------------------------------------------------------
-# 1. Password protection
+# 1. Password protection - Removed section as app is private for now
 # ---------------------------------------------------------------------
 
 # Initialise session variable as not authenticated
-if "authenticated" not in st.session_state:
-    st.session_state.authenticated = False
-
-# If not yet authenticated, show password field (and do not load rest of app)
-if not st.session_state.authenticated:
-    password = st.text_input("Enter password", type="password")
-
-    if password:
-        # Check password and authenticate if a match
-        if password == st.secrets["app_password"]:
-            st.session_state.authenticated = True
-            st.rerun()   # refresh to hide password field
-        else:
-            st.error("❌ Incorrect password!")
-            st.stop()
-    
-    else:
-        st.stop()  # wait for password input
+#if "authenticated" not in st.session_state:
+#    st.session_state.authenticated = False
+#
+## If not yet authenticated, show password field (and do not load rest of app)
+#if not st.session_state.authenticated:
+#    password = st.text_input("Enter password", type="password")
+#
+#    if password:
+#        # Check password and authenticate if a match
+#        if password == st.secrets["app_password"]:
+#            st.session_state.authenticated = True
+#            st.rerun()   # refresh to hide password field
+#        else:
+#            st.error("❌ Incorrect password!")
+#            st.stop()
+#    
+#    else:
+#        st.stop()  # wait for password input
 
 
 
@@ -181,6 +181,9 @@ elif page == "Add Entry":
         # Otherwise show add entry form
         else:
             text = st.text_area("What are you grateful for today? (Name at last one small thing, on thing you did for your health, and one thing you did for someone else.)", height=200)
+            steps = st.text_area("How many steps have you walked today?")
+            sentiment = st.slider('How do you feel today?', min_value=-1.0, max_value=1.0, step=0.1, value=0.0) # Added to replace function call
+            mood = st.select_slider('Select your mood', options=['Depressed', 'Sad', 'Okay', 'Happy', 'Elated'], value='Okay') # Added to replace function call
             image = st.file_uploader("Add a picture (optional)", type=["jpg", "jpeg", "png"])
             image_path = None
             submitted = st.form_submit_button("Save Entry")
@@ -204,9 +207,11 @@ elif page == "Add Entry":
                     image_path = image_name
 
                 # Get sentiment and weather data
-                sentiment, mood = sf.get_sentiment(text)
+                # sentiment, mood = sf.get_sentiment(text) Temporarily replaced with direct user input
                 temperature, weather = wth.get_weather(LAT, LONG, WEATHER_API_KEY)
-                jf.add_entry(supabase, now_str, text, sentiment, mood, weather, temperature, image_path)
+                topic = sf.get_topic(text)
+                jf.add_entry(supabase, now_str, text, sentiment, mood, weather, temperature, topic, image_path)
+                jf.add_steps(supabase, now_str, steps)
                 # Display success message
                 st.success("✅ Entry saved!")
 
@@ -231,6 +236,7 @@ elif page == "Timeline":
             temp = entry["temperature"]
             image_path = entry["imagepath"]
             steps = entry["steps"]
+            topic = entry["topic"]
 
             with st.expander(f"{str(date)[:10]}", expanded=True):
                 # Replace weather description with an emoji
@@ -251,7 +257,8 @@ elif page == "Timeline":
                     weather_image = "☁️"
 
                 # Compile subtitle of stats
-                st.write(f"**Mood:** {mood} ({sentiment}) ● **Weather:** {weather_image} ({temp}°C) ● **Steps**: {steps}")
+                st.write(f"**Mood:** {mood} ({sentiment}) ● **Topic**: {topic.capitalize()}")
+                st.write(f"**Weather:** {weather_image} ({temp}°C) ● **Steps**: {steps}")
 
                 # Display image if there is one with text side by side
                 if image_path:
@@ -295,11 +302,15 @@ elif page == "Edit Entries":
             temp = entry["temperature"]
             image_path = entry["imagepath"]
             steps = entry["steps"]
+            topic = entry["topic"]
 
             # Display with expander closed to make it easier to navigate
             with st.expander(f"{str(date)[:10]}", expanded=False):
                 new_text = st.text_area("Edit text", text, key=f"text_{eid}")
                 new_image = st.file_uploader("Change picture (optional)", type=["jpg", "jpeg", "png"], key=f"image_{eid}")
+                new_sentiment = st.slider('How do you feel today?', min_value=-1.0, max_value=1.0, step=0.1, value=sentiment, key=f"sentiment_{eid}") # Added to replace function call
+                new_mood = st.select_slider('Select your mood', options=['Depressed', 'Sad', 'Okay', 'Happy', 'Elated'], value=mood, key=f"mood_{eid}") # Added to replace function call
+
                 new_image_path = None
                 if new_image is not None:
 
@@ -322,9 +333,10 @@ elif page == "Edit Entries":
                 cols = st.columns(2)
                 with cols[0]:
                     if st.button("💾 Save changes", key=f"save_{eid}"):
-                        new_sentiment, new_mood = sf.get_sentiment(new_text)
+                        # new_sentiment, new_mood = sf.get_sentiment(new_text)
                         new_temperature, new_weather = wth.get_weather(LAT, LONG, WEATHER_API_KEY)
-                        jf.update_entry(supabase, eid, new_text, new_sentiment, new_mood, new_weather, new_temperature, new_image_path)
+                        new_topic = sf.get_topic(new_text)
+                        jf.update_entry(supabase, eid, new_text, new_sentiment, new_mood, new_weather, new_temperature, new_topic, new_image_path)
                         st.success("✅ Updated!")
                         st.rerun()
                 with cols[1]:

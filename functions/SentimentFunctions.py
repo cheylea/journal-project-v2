@@ -3,9 +3,7 @@
 
 # Imports
 from nltk.sentiment import SentimentIntensityAnalyzer
-import nltk
-
-
+from sentence_transformers import SentenceTransformer, util
 class SentimentFunctions:
     @staticmethod
     def get_sentiment(text):
@@ -30,3 +28,20 @@ class SentimentFunctions:
             emotion = "Upset"
     
         return compound, emotion
+    
+    def get_topic(text):
+        model = SentenceTransformer('all-MiniLM-L6-v2')
+        topics = {
+            "family": "family, parents, auntie, Blair, Bo, James, Kezia, Serenity, Martha, spouse, partner",
+            "health": "health, wellbeing, exercise, meditation, running, walking, sleep, diet, food, nutrition, gym, tidy",
+            "work": "job, career, projects, Workdry, council, boss, colleagues, team",
+            "nature": "nature, parks, walks, outdoors, trees, greenery, hiking, steps, climbing, mountains",
+            "pets": "cats, pets, animals, Penny, Basil, kitty"
+        }
+
+        topic_embeddings = model.encode(list(topics.values()), convert_to_tensor=True)
+
+        entry_emb = model.encode(text, convert_to_tensor=True)
+        sims = util.cos_sim(entry_emb, topic_embeddings)[0]
+        best_idx = sims.argmax()
+        return list(topics.keys())[best_idx]

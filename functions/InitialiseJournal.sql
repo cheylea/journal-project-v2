@@ -6,6 +6,7 @@ create table entry (
   entryid bigserial primary key,
   entrydate date,
   entrytext text,
+  topic text,
   sentiment decimal,
   mood text,
   weather text,

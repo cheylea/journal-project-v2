@@ -8,6 +8,7 @@ supabase>=2.5.0
 
 # NLP and sentiment analysis
 nltk>=3.9.1
+sentence-transformers>=2.2.2
 
 # Data and visualization
 pandas>=2.2.0
